@@ -1,0 +1,85 @@
+# Konfigurasi Yui
+llm:
+  model: "openai/gpt-oss-120b"  # TTFT ~0.38s, tools streaming OK, reasoning tidak bocor (tests/probe_all)
+  # failover berurutan kalau kena rate-limit/quota harian: key utama -> 3 cadangan -> 9Router
+  endpoints:
+    - {base_url: "https://api.groq.com/openai/v1", api_key_env: "GROQ_API_KEY"}
+    - {base_url: "https://api.groq.com/openai/v1", api_key_env: "GROQ_API_KEY_2"}
+    - {base_url: "https://api.groq.com/openai/v1", api_key_env: "GROQ_API_KEY_3"}
+    - {base_url: "https://api.groq.com/openai/v1", api_key_env: "GROQ_API_KEY_4"}
+    - {base_url: "http://localhost:20128/v1", api_key_env: "YUI_API_KEY", model: "groq/llama-3.3-70b-versatile"}
+  max_tokens: 256                # prompt membatasi 2-3 kalimat; batasi worst-case
+  temperature: 0.6
+
+language: "id"                 # Bahasa Indonesia untuk ASR + prompt
+
+wake:
+  prefix: "yui"                # respon jika kata ini ada di transkrip, posisi bebas (barge-in selalu aktif)
+
+asr:
+  backend: "auto"              # "auto" = Groq kalau env GROQ_API_KEY ada, else "local"
+  groq_model: "whisper-large-v3-turbo"  # dipakai kalau env GROQ_API_KEY ada (CEPAT, gratis)
+  model_size: "base"           # lokal (single-pass)
+  device: "cpu"
+  compute_type: "int8"
+  beam_size: 1                 # greedy = tercepat
+
+vad:
+  threshold: 0.5
+  min_speech_ms: 250           # abaikan suara lebih pendek dari ini
+  min_silence_ms: 500          # dianggap selesai bicara setelah diam selama ini
+  max_utterance_ms: 12000      # potong paksa ucapan lebih panjang dari ini
+  speaking_threshold: 0.65     # lebih ketat saat TTS playing (anti-echo)
+
+tts:
+  backend: "fish"              # fish = cloud gratis, suara anime dari library | lainnya = edge-tts
+  fish_voice_id: "16917a9d5d5d4320bb0810f4880a50a3"  # suara default (terverifikasi gratis)
+  character_voices:                # suara per karakter (folder web/assets/<nama>) — menimpa default
+    osagegirl: "16917a9d5d5d4320bb0810f4880a50a3"
+    poblanc: "44b6e5eeab214296bcfd73e767225229"
+
+  voice: "id-ID-GadisNeural"   # fallback edge-tts; alternatif: id-ID-ArdiNeural
+  rate: "+0%"                  # dilambatin dari +10% biar lebih santai
+  pitch: "+30Hz"               # lebih tinggi = lebih muda/cute. Sampel bandingin: tests/assets/voice_*.mp3
+  # fallback offline otomatis: pyttsx3/SAPI jika edge-tts gagal (butuh suara ID di Windows)
+
+voice_lang: "ja"               # suara menjawab bahasa Jepang (input tetap Indonesia; WA tetap Indonesia)
+
+audio:
+  sample_rate: 16000
+  channels: 1
+
+memory:
+  db_path: "memory/yui.db"
+  facts_path: "memory/facts.json"
+  history_turns: 6             # konteks yang dikirim ke LLM (lebih sedikit = TTFT lebih cepat)
+
+web:
+  host: "127.0.0.1"
+  port: 8765
+
+browser:
+  kimi_web: "http://127.0.0.1:5494"
+  session_id: "SESSION_ID_DISINI"  # session di dashboard kimi web buat tugas browser
+  token: ""            # isi kalau kimi web dinyalakan dengan --auth-token
+  timeout_s: 300
+
+wa:
+  enabled: true              # matikan = false; pairing ulang: bin\wacli.exe auth
+  wacli_path: "bin/wacli.exe"
+  self_number: "6281234567890"  # terdeteksi dari linked_jid — verifikasi pengirim perintah
+  chat_jid: "120360000000000000@g.us"  # grup contoh (self-chat tidak bisa dikirimi balasan oleh wacli)
+  # pesan dari HP utama datang sbg SenderJID @lid + FromMe=false; nomor kedua (ilham) sbg PN biasa
+  allow_numbers: ["6281234567890"]
+  webhook_secret: "WEBHOOK_SECRET_DISINI"
+
+hotkeys:
+  interrupt: "f9"            # tekan untuk menghentikan Yui bicara
+  clickthrough: "f10"        # toggle click-through saat mode pet
+  pause: "f11"               # toggle mode diam (mic tetap jalan, ucapan diabaikan)
+  debug: "f8"                # toggle kotak debug bounds karakter (mode pet)
+
+desktop:
+  pet: true                  # avatar muncul sebagai desktop pet (transparan, on-top)
+  width: 320
+  height: 420

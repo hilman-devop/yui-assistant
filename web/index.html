@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Yui</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d1117; overflow: hidden; }
+  html.pet, body.pet { background: transparent; }
+  canvas { display: block; }
+  #status {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    color: #e6edf3; font: 14px/1.4 system-ui, sans-serif;
+    background: rgba(22,27,34,.85); border: 1px solid #30363d;
+    padding: 6px 14px; border-radius: 999px; user-select: none;
+  }
+  body.pet #status { font-size: 11px; padding: 3px 10px; opacity: .75; }
+  #dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: #8b949e; }
+  .idle #dot { background: #8b949e; } .processing #dot { background: #d29922; }
+  .speaking #dot { background: #3fb950; } .paused #dot { background: #f85149; }
+</style>
+</head>
+<body>
+<div id="status" class="idle"><span id="dot"></span><span id="label">Yui — idle</span></div>
+<script src="/vendor/live2d.min.js"></script>
+<script src="/vendor/live2dcubismcore.min.js"></script>
+<script src="/vendor/pixi.min.js"></script>
+<script src="/vendor/pixi-live2d-display.min.js"></script>
+<script>
+// karakter aktif diambil dari server (ganti via tool ganti_karakter / POST /api/character;
+// tes kompatibilitas model baru: /assets/modeltest.html?m=<folder>/<file>)
+const LABEL = { idle: "Yui — Mendengarkan", processing: "Yui — Berpikir…", speaking: "Yui — Berbicara",
+                paused: "Yui — Diam (F11 lanjut)" };
+const PET = new URLSearchParams(location.search).has("pet");
+if (PET) { document.documentElement.classList.add("pet"); document.body.classList.add("pet"); }
+// tampilkan error di pill (pet window tidak punya devtools)
+window.onerror = (msg, src, line) => {
+  document.getElementById("label").textContent = `ERR: ${msg} @${(src||"").split("/").pop()}:${line}`;
+};
+window.onunhandledrejection = (e) => {
+  document.getElementById("label").textContent = `ERR async: ${e.reason && e.reason.message || e.reason}`;
+};
+
+(async () => {
+  const app = new PIXI.Application({ resizeTo: window, backgroundAlpha: 0 });
+  document.body.appendChild(app.view);
+  let model;
+  try {
+    const { model: aktif } = await (await fetch("/api/character")).json();
+    model = await PIXI.live2d.Live2DModel.from("/assets/" + aktif);
+  } catch (e) {
+    document.getElementById("label").textContent = `Gagal load model: ${e.message || e}`;
+    throw e;
+  }
+  app.stage.addChild(model);
+  window.__model = model;  // buat debug/evaluate dari luar
+  // Fit ke bounds HASIL RENDER (bukan bounds logis — model fan-made sering geser origin
+  // sehingga badan kepotong). Zoom disimpan di localStorage (scroll mouse di pet).
+  let zoom = parseFloat(localStorage.getItem("yui_zoom") || "1");
+  const pasang = () => {
+    model.scale.set(1); model.anchor.set(0, 0); model.x = 0; model.y = 0;
+    app.renderer.render(app.stage);            // pastikan bounds akurat
+    const b = model.getBounds();
+    const s = Math.min(innerWidth / b.width, innerHeight / b.height) * 0.98 * zoom;
+    model.scale.set(s);
+    model.x = (innerWidth - b.width * s) / 2 - b.x * s;
+    model.y = innerHeight - (b.y + b.height) * s;
+  };
+  pasang();
+  addEventListener("resize", pasang);
+  addEventListener("wheel", (e) => {
+    zoom = Math.min(3, Math.max(0.3, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+    localStorage.setItem("yui_zoom", zoom.toFixed(3));
+    pasang();
+  });
+
+  // debug bounds (F8): kotak merah = batas render karakter real-time + info ukuran
+  const dbg = new PIXI.Graphics();
+  const dbgText = new PIXI.Text("", { fill: "#ff5555", fontSize: 12 });
+  dbgText.x = 8; dbgText.y = 36;
+  app.stage.addChild(dbg, dbgText);
+  let showBox = false;
+  window.__toggleBounds = () => { showBox = !showBox; if (!showBox) { dbg.clear(); dbgText.text = ""; } };
+
+  let amp = 0, state = "idle";
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  setInterval(() => ws.readyState === 1 && ws.send("ping"), 5000);
+  ws.onmessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.reload) { location.reload(); return; }  // ganti karakter
+    state = m.state; amp = m.amp;
+    const el = document.getElementById("status");
+    el.className = state;
+    document.getElementById("label").textContent = LABEL[state] || state;
+  };
+
+  // mode pet: drag window + toggle click-through (scheme yui:// dicegat Qt)
+  if (PET) {
+    document.addEventListener("mousedown", () => { location.href = "yui://drag"; });
+    document.addEventListener("dblclick", () => { location.href = "yui://toggle"; });
+  }
+
+  app.ticker.add(() => {
+    if (showBox) {
+      const b = model.getBounds();  // koordinat layar, berubah saat animasi/physics
+      dbg.clear().lineStyle(2, 0xff5555, 1).drawRect(b.x, b.y, b.width, b.height);
+      dbgText.text = `${Math.round(b.width)}x${Math.round(b.height)}px  zoom ${zoom.toFixed(2)}x  window ${innerWidth}x${innerHeight}`;
+    }
+    // lip-sync amplitudo: mulut buka proporsional terhadap volume suara Yui
+    try {
+      const target = state === "speaking" ? Math.min(1, amp * 6) : 0;
+      const core = model.internalModel.coreModel;
+      const cur = core.getParameterValueById("ParamMouthOpenY") || 0;
+      core.setParameterValueById("ParamMouthOpenY", cur + (target - cur) * 0.4);
+    } catch (e) { /* model tanpa param itu */ }
+  });
+})();
+</script>
+</body>
+</html>

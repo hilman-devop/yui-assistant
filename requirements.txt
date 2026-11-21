@@ -1,0 +1,21 @@
+faster-whisper>=1.1
+onnxruntime
+sounddevice
+numpy
+edge-tts
+pyttsx3  # fallback TTS offline (SAPI)
+httpx    # TTS cloud (Fish/ElevenLabs) + tools browser/character/pause + desktop
+miniaudio
+openai
+pyyaml
+pycaw
+screen-brightness-control
+keyboard
+pyperclip
+pygetwindow
+mss  # dipakai tests/check_t11.py (screenshot transparansi pet)
+fastapi
+uvicorn
+websockets
+PyQt6
+PyQt6-WebEngine

@@ -1,0 +1,49 @@
+# --- umum ---
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- dependensi & build ---
+node_modules/
+vendor/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+out/
+.target/
+.graphify_*
+graphify-out/
+
+# --- runtime / data ---
+*.db
+*.sqlite
+*.sqlite3
+*.pid
+.cache/
+.tmp/
+.tmp
+data_cache/
+scratch/
+logs/
+
+# --- IDE / tooling ---
+.opencode/
+.dart_tool/
+.gradle/
+.pio/
+.chrome-profile/
+# --- python ---
+*.egg-info/
+.venv/
+
