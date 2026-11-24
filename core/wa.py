@@ -68,7 +68,7 @@ class WaBridge:
                 return
         # FromMe=true = dikirim device wacli ini (balasan Yui sudah ke-filter anti-loop).
         # Pesan dari HP user tiba sbg SenderJID @lid/PN + FromMe=false -> cocokkan whitelist.
-        # JID bisa bawa suffix device ("150285888565280:7@lid") -> buang ":device"
+        # JID bisa bawa suffix device ("100000000000001:7@lid") -> buang ":device"
         sender = (payload.get("SenderJID") or "").split("@")[0].split(":")[0]
         sender_ok = payload.get("FromMe") or sender in self._allow
         if not sender_ok:

@@ -65,14 +65,14 @@ async def main() -> None:
     await bridge.handle({"Chat": SELF, "SenderJID": SELF, "FromMe": True, "Text": "hai"})
     assert agent.calls == 1 and len(sent) == 1, "pengirim lain / chat lain harus ditolak"
     # 3b) FromMe=true kebal format JID @lid (WA baru) — tetap diterima
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": True, "Text": "lagi?"})
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": True, "Text": "lagi?"})
     assert agent.calls == 2, "FromMe=true harus diterima walau SenderJID berupa @lid"
     # 3c) identitas lain user (allow_numbers, FromMe=false) diterima: LID HP utama + PN HP kedua
-    bridge._allow.update({"150285888565280", "6285133290588"})
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": False, "Text": "dari hp utama"})
-    await bridge.handle({"Chat": GROUP, "SenderJID": "6285133290588@s.whatsapp.net", "FromMe": False, "Text": "dari hp kedua"})
+    bridge._allow.update({"100000000000001", "6281234567891"})
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": False, "Text": "dari hp utama"})
+    await bridge.handle({"Chat": GROUP, "SenderJID": "6281234567891@s.whatsapp.net", "FromMe": False, "Text": "dari hp kedua"})
     # JID dengan suffix device (:7) — device kedua akun yang sama
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280:7@lid", "FromMe": False, "Text": "dari device lain"})
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001:7@lid", "FromMe": False, "Text": "dari device lain"})
     assert agent.calls == 5, "LID/PN (+suffix device) di allow_numbers harus diterima"
     print("filter pengirim/chat OK")
 
@@ -90,20 +90,20 @@ async def main() -> None:
         return True
     bridge._transcribe_vn, bridge._reply_voice = fake_tr, fake_rv
     # wacli mengirim VN sebagai Text='[Audio]' + MessageID (tanpa MediaType pun terdeteksi)
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": False,
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": False,
                          "Text": "[Audio]", "MessageID": "ABC123"})
     assert agent.calls == 6 and voice_sent == ["jawaban tes"], "VN harus ditranskrip + dibalas VN"
     async def fake_rv_gagal(chat, text):
         return False
     bridge._reply_voice = fake_rv_gagal
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": False,
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": False,
                          "Text": "[Audio]", "MessageID": "DEF456"})
     assert agent.calls == 7 and sent[-1] == "jawaban tes", "VN gagal kirim harus fallback teks"
     await bridge.handle({"Chat": GROUP, "SenderJID": SELF, "FromMe": True,
                          "Text": "[Audio]", "MessageID": "GHI789"})
     assert agent.calls == 7, "VN dari device sendiri harus diabaikan (anti-loop)"
     # placeholder media non-audio ([Image] dll) jangan pernah diteruskan ke LLM
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": False,
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": False,
                          "Text": "[Image]", "MessageID": "JKL012"})
     assert agent.calls == 7, "placeholder media non-audio harus diabaikan"
     print("VN masuk/balas OK")
@@ -113,7 +113,7 @@ async def main() -> None:
     async def fake_doc(chat, mid):
         uploaded.append(mid)
     bridge._dokumen_ke_notebooklm = fake_doc
-    await bridge.handle({"Chat": GROUP, "SenderJID": "150285888565280@lid", "FromMe": False,
+    await bridge.handle({"Chat": GROUP, "SenderJID": "100000000000001@lid", "FromMe": False,
                          "Text": "[Document]", "MessageID": "DOC1"})
     assert uploaded == ["DOC1"] and agent.calls == 7, "dokumen user harus ke upload, bukan LLM"
     await bridge.handle({"Chat": GROUP, "SenderJID": "628999@s.whatsapp.net", "FromMe": False,
